@@ -1,3 +1,4 @@
+import re
 import time
 from datetime import datetime
 import threading
@@ -17,15 +18,16 @@ class PageBot:
     INPUT_XPATH = "/html/body/div[2]/div[2]/div/div[1]/div/div[2]/div[3]/div/input"
     BUTTON_XPATHS = [
         "/html/body/div[2]/div[2]/div/div[1]/div/div[2]/button",
-        # "/html/body/div[2]/div[2]/div/div[2]/div/div[1]/div[1]/div[8]/div[3]/div/div[2]/div/button"
     ]
     JOIN_XPATHS = [
-        "/html/body/div[2]/div[2]/div/div[2]/div/div[1]/div[1]/div[4]/div[2]/div/div[2]/button",
-        "/html/body/div[2]/div[2]/div/div[2]/div/div[1]/div[1]/div[4]/div[2]/div/div[2]/button[1]",
-        "/html/body/div[2]/div[2]/div/div[2]/div/div[1]/div[1]/div[4]/div[2]/div/div[2]/button[2]",
-        "/html/body/div[2]/div[2]/div/div[2]/div/div[1]/div[2]/div/div[2]/button[2]"
+        "/html/body/div[15]/div/div/div/div[1]/button",
+        "/html/body/div[3]/div[2]/div/div[2]/div/div[1]/div[1]/div[4]/div[2]/div/div[2]/button",
+        "/html/body/div[3]/div[2]/div/div[2]/div/div[1]/div[1]/div[4]/div[2]/div/div[2]/button[1]",
+        "/html/body/div[3]/div[2]/div/div[2]/div/div[1]/div[1]/div[4]/div[2]/div/div[2]/button[2]",
+        "/html/body/div[3]/div[2]/div/div[2]/div/div[1]/div[2]/div/div[2]/button[2]"
     ]
     JOIN_MES = [
+        "邪魔なポップアップ閉じる",
         "参加許可準備",
         "参加許可準備",
         "1人の参加許可を実行",
@@ -51,7 +53,7 @@ class PageBot:
     def run_bot(self):
         self.log("Webドライバ生成中")
         options = Options()
-        options.add_argument('--headless=new')
+        # options.add_argument('--headless=new')
         options.add_argument('--enable-javascript')
         options.add_argument('incognito')
         service = Service(ChromeDriverManager().install())
@@ -76,7 +78,8 @@ class PageBot:
         while True:
             try:
                 button = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "//button[contains(text(), 'コンピューターでオーディオに接続')]"))
+                    EC.presence_of_element_located(
+                        (By.XPATH, "//button[contains(text(), 'コンピューターでオーディオに接続')]"))
                 )
                 time.sleep(1)
                 button.click()
@@ -140,7 +143,7 @@ class App:
         self.pass_text = StringVar()
         self.pass_text.set("")
         Label(window, text="パスワード:").grid(row=1, column=0, sticky='w')
-        Entry(window, textvariable=self.pass_text,show='*', width=82).grid(row=1, column=1)
+        Entry(window, textvariable=self.pass_text, show='*', width=82).grid(row=1, column=1)
         self.name_text = StringVar()
         self.name_text.set("ホスト用＠イヤホンなし")
         Label(window, text="Zoom名:").grid(row=2, column=0, sticky='w')
@@ -160,10 +163,27 @@ class App:
     def run_bot(self):
         self.log_area.delete("1.0", "end")
         url = self.url_text.get().replace("/j/", "/wc/join/")
+        # 正規表現を使用してURLとパスワードを抽出
+        url_pattern = r"https://\S+"
+        password_pattern = r'\(パスコード: ([a-zA-Z0-9]+)\)'
+
+        url_match = re.search(url_pattern, url)
+        password_match = re.search(password_pattern, url)
+
+        # URLとパスワードを変数に格納
+        if url_match:
+            self.url_text.set(url_match.group(0))
+        else:
+            self.url_text.set(url)
+
+        if password_match:
+            self.pass_text.set(password_match.group(1))
+
         if not "/wc/join/" in url:
             self.log("正しいZoomのURLを入力してください。")
             return
-        self.bot = PageBot(url, self.pass_text.get(), self.log, self.name_text.get())
+
+        self.bot = PageBot(self.url_text.get(), self.pass_text.get(), self.log, self.name_text.get())
         self.run_button.configure(state="disabled")  # 起動ボタンを無効化
         self.stop_button.configure(state="normal")  # 終了ボタンを有効化
         threading.Thread(target=self.bot.run_bot).start()
